@@ -40,6 +40,18 @@ async function main() {
     ? createApiBackend({ client: new Anthropic(), model: env.ANTHROPIC_MODEL || undefined })
     : createClaudeCodeBackend({ model: env.CLAUDE_CODE_MODEL || undefined });
 
+  const settings = {
+    backend: backend.name,
+    maxAnalyses: num(env.MAX_ANALYSES_PER_RUN, 60),
+    concurrency: num(env.ANALYSIS_CONCURRENCY, useApi ? 5 : 1),
+    minOffering: num(env.FORM_D_MIN_OFFERING, 2_000_000),
+    jobsEveryNDays: num(env.JOBS_RUN_EVERY_N_DAYS, 1),
+    secUserAgentSet: Boolean(env.SEC_USER_AGENT),
+    jobsEnabled: Boolean(env.RAPIDAPI_KEY),
+  };
+  // Non-secret settings only, so a misplaced GitHub variable is obvious in the log.
+  console.log("[settings]", JSON.stringify(settings, null, 2));
+
   const outcomes = [
     await step("sync", () =>
       runSync(db, {
@@ -47,15 +59,15 @@ async function main() {
         today,
         secUserAgent: required("SEC_USER_AGENT"),
         rapidApiKey: env.RAPIDAPI_KEY || null,
-        minOffering: num(env.FORM_D_MIN_OFFERING, 2_000_000),
-        jobsEveryNDays: num(env.JOBS_RUN_EVERY_N_DAYS, 1),
+        minOffering: settings.minOffering,
+        jobsEveryNDays: settings.jobsEveryNDays,
       }),
     ),
     await step("analyze", () =>
       runAnalyze(db, {
         backend,
-        maxAnalyses: num(env.MAX_ANALYSES_PER_RUN, 60),
-        concurrency: num(env.ANALYSIS_CONCURRENCY, useApi ? 5 : 1),
+        maxAnalyses: settings.maxAnalyses,
+        concurrency: settings.concurrency,
         deadline: new Date(startedAt + ANALYZE_BUDGET_MS),
       }),
     ),
