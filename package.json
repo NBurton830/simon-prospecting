@@ -11,8 +11,8 @@
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
     "db:generate": "drizzle-kit generate",
-    "db:migrate": "tsx scripts/db-migrate.ts",
-    "pipeline": "tsx scripts/pipeline/run.ts"
+    "db:migrate": "tsx --env-file-if-exists=.env.local scripts/db-migrate.ts",
+    "pipeline": "tsx --env-file-if-exists=.env.local scripts/pipeline/run.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^1.0.0",
