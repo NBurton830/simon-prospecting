@@ -62,8 +62,9 @@ async function main() {
   ];
   if (today.endsWith("-01")) outcomes.push(await step("retention", () => runRetention(db, today)));
 
-  // Non-zero only when every step failed, so GitHub flags real outages.
-  if (outcomes.every((ok) => !ok)) process.exit(1);
+  // Any step that threw (missing setting, database down, …) turns the GitHub run red.
+  // A source that failed inside sync (e.g. JSearch over quota) is recorded in pipeline_runs instead.
+  if (outcomes.some((ok) => !ok)) process.exit(1);
 }
 
 main().catch((err) => {
