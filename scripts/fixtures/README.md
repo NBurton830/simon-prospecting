@@ -42,9 +42,11 @@ What the real captures showed:
 - The CLI silently ignores a JSON Schema that includes Zod's `$schema` key. The output then has no `structured_output` field and no error.
 - `--tools ""` also disables `--json-schema`. Use `--tools StructuredOutput`.
 
-## `jsearch/` (synthetic)
+## `jsearch/`
 
-`search.SYNTHETIC.json` follows JSearch's documented `/search` response format. The companies are fictional, apart from the blocklisted big employers. It covers:
+`search-v2.json` is a real `/search-v2` response for "Head of Retail" (Oct 23, 2026), with logos, reviews, highlights and apply options removed. JSearch renamed `/search` to `/search-v2` that month and wrapped the list in `data.jobs`. `job_state` is now a full state name ("Maryland").
+
+`search.SYNTHETIC.json` follows the older `/search` format (a `data` array). The parser still accepts it. The companies are fictional, apart from the blocklisted big employers. It covers:
 
 - a description over 4,000 characters;
 - a title that fails the retail filter;
@@ -53,4 +55,4 @@ What the real captures showed:
 - a missing website and a missing posted date;
 - 16 listings from one employer, which trips the high-volume rule.
 
-Replace it with a real capture once there is a `RAPIDAPI_KEY`.
+It stays because it covers edge cases the real capture doesn't.

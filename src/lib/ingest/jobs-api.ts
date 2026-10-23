@@ -1,10 +1,11 @@
 import { EXCLUDED_EMPLOYERS, HIGH_VOLUME_EMPLOYER_THRESHOLD } from "@/config/excluded-employers";
-import { RETAIL_TITLE_PATTERN } from "@/config/job-queries";
+import { isSeniorOrGrowthTitle, RETAIL_TITLE_PATTERN } from "@/config/job-queries";
 import { MAX_DESCRIPTION_CHARS } from "@/lib/analysis/prompt";
 import { toEpochDay } from "@/lib/dates";
 import { normalizeCompanyName } from "./entity";
 
-export const JSEARCH_URL = "https://jsearch.p.rapidapi.com/search";
+// JSearch moved search from /search (data: [...]) to /search-v2 (data: { jobs, cursor }) in Oct 2026.
+export const JSEARCH_URL = "https://jsearch.p.rapidapi.com/search-v2";
 export const JSEARCH_HOST = "jsearch.p.rapidapi.com";
 
 export interface JobListing {
@@ -21,9 +22,11 @@ export interface JobListing {
 
 const str = (v: unknown): string | null => (typeof v === "string" && v.trim() ? v.trim() : null);
 
-// Maps a JSearch /search response to listings. Throws on a response without a `data` array.
+// Maps a JSearch response to listings: /search-v2 (`data.jobs`) or the older /search (`data` array).
+// Throws when neither holds an array.
 export function parseJSearchResponse(json: unknown): JobListing[] {
-  const data = (json as { data?: unknown } | null)?.data;
+  const raw = (json as { data?: unknown } | null)?.data;
+  const data = Array.isArray(raw) ? raw : (raw as { jobs?: unknown } | null)?.jobs;
   if (!Array.isArray(data)) {
     const message = str((json as { message?: unknown } | null)?.message);
     throw new Error(`Unexpected JSearch response${message ? `: ${message}` : ""}`);
@@ -59,7 +62,7 @@ export interface JobFilterResult {
 }
 
 // In order: de-duplicate by jobId, drop blocklisted employers (compared after normalizeCompanyName),
-// drop titles not matching the retail pattern, then drop every listing from employers with more
+// drop titles not matching the retail pattern or naming entry-level store roles, then drop every listing from employers with more
 // than `highVolumeThreshold` remaining listings.
 export function filterJobListings(
   listings: JobListing[],
@@ -80,7 +83,7 @@ export function filterJobListings(
       dropped.duplicate++;
     } else if ((seen.add(listing.jobId), blocklist.has(normalizeCompanyName(listing.employerName)))) {
       dropped.blocklisted++;
-    } else if (!titlePattern.test(listing.title)) {
+    } else if (!titlePattern.test(listing.title) || !isSeniorOrGrowthTitle(listing.title)) {
       dropped.titleMismatch++;
     } else {
       candidates.push(listing);

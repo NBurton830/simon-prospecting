@@ -9,8 +9,66 @@ import {
   type JobListing,
 } from "@/lib/ingest/jobs-api";
 import { fixtureJson } from "../helpers/fixtures";
+import { JSEARCH_URL } from "@/lib/ingest/jobs-api";
+import { isSeniorOrGrowthTitle } from "@/config/job-queries";
+
+test("calls the /search-v2 endpoint", () => {
+  expect(JSEARCH_URL).toBe("https://jsearch.p.rapidapi.com/search-v2");
+  expect(new URL(jsearchUrl("Head of Retail")).pathname).toBe("/search-v2");
+});
 
 const listings = () => parseJSearchResponse(fixtureJson("jsearch/search.SYNTHETIC.json"));
+
+describe("parseJSearchResponse — real /search-v2 capture (Oct 23, 2026)", () => {
+  const real = () => parseJSearchResponse(fixtureJson("jsearch/search-v2.json"));
+
+  test("reads jobs from data.jobs", () => {
+    const all = real();
+    expect(all).toHaveLength(10);
+    expect(all[0]).toMatchObject({
+      employerName: "FedEx Office",
+      employerWebsite: "https://www.office.fedex.com",
+      title: "Retail Assistant Manager",
+      city: "Laurel",
+      state: "Maryland",
+      postedAt: "2026-10-21T00:00:00.000Z",
+    });
+    for (const l of all) {
+      expect(l.jobId).not.toBe("");
+      expect(l.applyLink).toMatch(/^https?:\/\//);
+      expect(l.description.length).toBeLessThanOrEqual(MAX_DESCRIPTION_CHARS);
+    }
+  });
+
+  test("a missing employer website comes through as null", () => {
+    expect(real().find((l) => l.employerName === "AT&T")?.employerWebsite).toBeNull();
+  });
+
+  test("the filters drop the national chains and store-staff roles in it", () => {
+    const { kept } = filterJobListings(real());
+    expect(kept.map((l) => `${l.employerName} — ${l.title}`)).toEqual([
+      "QuinceDresses — Store Manager , Dress & Fashion Retail (English/Spanish Bilingual Required)",
+    ]);
+  });
+});
+
+describe("isSeniorOrGrowthTitle", () => {
+  test.each([
+    ["Director of Retail", true],
+    ["Head of Retail", true],
+    ["Opening Store Manager", true],
+    ["Store Manager", true],
+    ["Pop-up Shop Manager", true],
+    ["Retail Assistant Manager", false],
+    ["Retail Sales Consultant", false],
+    ["Retail Merchandiser", false],
+    ["Retail Sales Associate - Part Time", false],
+    ["Assistant Manager, New Store Opening", true],
+    ["Key Holder - Flagship", true],
+  ])("%s → %s", (title, expected) => {
+    expect(isSeniorOrGrowthTitle(title)).toBe(expected);
+  });
+});
 
 describe("parseJSearchResponse", () => {
   test("maps every listing", () => {
@@ -53,7 +111,7 @@ describe("parseJSearchResponse", () => {
 describe("jsearchUrl", () => {
   test("sets the documented query parameters", () => {
     const url = new URL(jsearchUrl("Director of Retail"));
-    expect(url.origin + url.pathname).toBe("https://jsearch.p.rapidapi.com/search");
+    expect(url.origin + url.pathname).toBe("https://jsearch.p.rapidapi.com/search-v2");
     expect(url.searchParams.get("query")).toBe("Director of Retail");
     expect(url.searchParams.get("country")).toBe("us");
     expect(url.searchParams.get("date_posted")).toBe("3days");
